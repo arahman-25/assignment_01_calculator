@@ -1,121 +1,264 @@
 import 'package:flutter/material.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const CalcApp());
+  } 
+
+class CalcApp extends StatefulWidget {
+  const CalcApp({super.key});
+
+  @override
+  State<CalcApp> createState() => _CalcAppState();
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class _CalcAppState extends State<CalcApp> {
+  bool isDark = true;
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
+    final darkTheme = ThemeData(
+      brightness: Brightness.dark,
+      scaffoldBackgroundColor: Colors.black,
+      colorScheme: const ColorScheme.dark(
+        primary: Colors.blueAccent,
+        secondary: Colors.redAccent,
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+    );
+
+    final lightTheme = ThemeData(
+      brightness: Brightness.light,
+      scaffoldBackgroundColor: Colors.white,
+      colorScheme: const ColorScheme.light(
+        primary: Colors.blue,
+        secondary: Colors.red,
+      ),
+    );
+
+    return AnimatedTheme(
+      duration: const Duration(milliseconds: 300),
+      data: isDark ? darkTheme : lightTheme,
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Calculator(
+          isDark: isDark,
+          onToggleTheme: () {
+            setState(() => isDark = !isDark);
+          },
+        ),
+      ),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
+class Calculator extends StatefulWidget {
+  final bool isDark;
+  final VoidCallback onToggleTheme;
 
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+  const Calculator({
+    super.key,
+    required this.isDark,
+    required this.onToggleTheme,
+  });
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<Calculator> createState() => _CalculatorState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _CalculatorState extends State<Calculator> {
+  double accumulator = 0;
+  String? op;
+  String buffer = "";
+  bool afterEquals = false;
+  String display = "0";
+  bool error = false;
 
-  void _incrementCounter() {
+  void pressDigit(String d) {
+    if (error) {
+      _reset();
+    }
+    if (afterEquals) {
+      _reset();
+    }
+    buffer += d;
+    setState(() => display = buffer);
+  }
+
+  void pressOperator(String newOp) {
+    if (error) return;
+
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      afterEquals = false;
+
+      if (buffer.isEmpty && op != null) {
+        op = newOp;
+        return;
+      }
+
+      if (op == null && buffer.isNotEmpty) {
+        accumulator = double.parse(buffer);
+        buffer = "";
+        op = newOp;
+        display = accumulator.toString();
+        return;
+      }
+
+      if (op != null && buffer.isNotEmpty) {
+        final value = double.parse(buffer);
+
+        final result = _apply(accumulator, value, op!);
+        if (result == null) {
+          display = "Error";
+          error = true;
+          return;
+        }
+
+        accumulator = result;
+        buffer = "";
+        op = newOp;
+        display = accumulator.toString();
+      }
     });
+  }
+
+  void pressEquals() {
+    if (error) return;
+
+    setState(() {
+      if (buffer.isEmpty || op == null) {
+        return;
+      }
+
+      final value = double.parse(buffer);
+      final result = _apply(accumulator, value, op!);
+
+      if (result == null) {
+        display = "Error";
+        error = true;
+        return;
+      }
+
+      accumulator = result;
+      display = accumulator.toString();
+      buffer = "";
+      op = null;
+      afterEquals = true;
+    });
+  }
+
+  void pressClear() {
+    setState(() => _reset());
+  }
+
+  void _reset() {
+    accumulator = 0;
+    op = null;
+    buffer = "";
+    display = "0";
+    afterEquals = false;
+    error = false;
+  }
+
+  double? _apply(double a, double b, String op) {
+    if (op == '/' && b == 0) {
+      return null; 
+    }
+    switch (op) {
+      case '+': return a + b;
+      case '-': return a - b;
+      case '*': return a * b;
+      case '/': return a / b;
+    }
+    return a;
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
+    final keys = [
+      '7','8','9','/',
+      '4','5','6','*',
+      '1','2','3','-',
+      '0','.','=','+',
+      'AC'
+    ];
+
     return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+        title: const Text("Calculator"),
+        actions: [
+          IconButton(
+            icon: Icon(widget.isDark ? Icons.light_mode : Icons.dark_mode),
+            onPressed: widget.onToggleTheme,
+          )
+        ],
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
-          children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+      body: Column(
+        children: [
+          Expanded(
+            child: Container(
+              alignment: Alignment.bottomRight,
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                display,
+                style: const TextStyle(fontSize: 48),
+              ),
             ),
-          ],
-        ),
+          ),
+          Expanded(
+            flex: 2,
+            child: GridView.builder(
+              itemCount: keys.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+              ),
+              itemBuilder: (_, i) {
+                final k = keys[i];
+                return _button(k);
+              },
+            ),
+          )
+        ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
+    );
+  }
+
+  Widget _button(String label) {
+    final theme = Theme.of(context).colorScheme;
+
+    Color color = theme.primary;
+    if (label == "AC") color = theme.secondary;
+    if (RegExp(r'[0-9.]').hasMatch(label)) {
+      color = widget.isDark ? Colors.grey[850]! : Colors.grey[300]!;
+    }
+
+    return GestureDetector(
+      onTap: () {
+        if (RegExp(r'[0-9.]').hasMatch(label)) {
+          pressDigit(label);
+        } else if ("+-*/".contains(label)) {
+          pressOperator(label);
+        } else if (label == "=") {
+          pressEquals();
+        } else if (label == "AC") {
+          pressClear();
+        }
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        margin: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 24,
+              color: widget.isDark ? Colors.white : Colors.black,
+            ),
+          ),
+        ),
       ),
     );
   }
